@@ -644,7 +644,7 @@ function App() {
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ativo</th>
                         <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Preço</th>
                         <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Retorno (%)</th>
-                        <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Volatilidade</th>
+                        
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -670,9 +670,7 @@ function App() {
                                 {retornoAcumulado !== null ? `${retornoAcumulado.toFixed(2)}%` : '-'}
                               </span>
                             </td>
-                            <td className="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-900">
-                              {dados ? `${dados.volatilidade?.toFixed(2)}%` : '-'}
-                            </td>
+
                           </tr>
                         );
                       })}
@@ -715,7 +713,7 @@ function App() {
               ) : dadosGrafico.length > 0 ? (
                 <div className="h-96">
                   <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={dadosGrafico} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <LineChart data={dadosGrafico} margin={{ top: 5, right: 30, left: 20, bottom: 5 }} >
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis 
                       dataKey="data" 
@@ -748,7 +746,8 @@ function App() {
                         stroke={cores[index % cores.length]}
                         name={getNomeAtivo(ticker)}
                         dot={false}
-                        activeDot={{ r: 6 }}
+                        activeDot={{ r: 6 }}  
+                        connectNulls={true}                      
                       />
                     ))}
                     
@@ -762,7 +761,8 @@ function App() {
                         strokeWidth={3}
                         name={nomeCesta}
                         dot={false}
-                        activeDot={{ r: 7 }}
+                        activeDot={{ r: 7 }} 
+                        connectNulls={true}                       
                       />
                     )}
                   </LineChart>
