@@ -1,8 +1,8 @@
-import React, { useState, useEffect,useRef , useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-
-
+import CestasManager from './components/CestasManager';
+import CestaComposition from './components/CestaComposition';
 
 // Configuração da URL base da API
 const API_URL = 'http://localhost:5000/api';
@@ -26,10 +26,13 @@ function App() {
   // Estado para armazenar dados históricos processados para cálculos consistentes
   const [dadosProcessados, setDadosProcessados] = useState({});
 
+  // Estado para controlar o gerenciador de cestas
+  const [mostrarGerenciadorCestas, setMostrarGerenciadorCestas] = useState(false);
+
   // Referência para o formulário de pesos da cesta
   const cestaFormRef = useRef(null);
 
-    // Adicione esta função para calcular os dados da cesta ponderada
+  // Adicione esta função para calcular os dados da cesta ponderada
   const calcularCesta = useCallback((dadosProcessados, pesos) => {
     // Verificar se temos dados suficientes
     if (Object.keys(dadosProcessados).length === 0 || Object.keys(pesos).length === 0) {
@@ -217,31 +220,42 @@ function App() {
         valor: ((dado.fechamento_ajustado / primeiroValor) - 1) * 100 // Retorno percentual desde o início
       }));
       
-    // Armazenar estatísticas calculadas
-    processados[ticker] = {
-      dados: dadosOrdenados,
-      primeiroValor,
-      ultimoValor,
-      retornoTotal,
-      retornoAnualizado,
-      volatilidade,
-      maxDrawdown,
-      retornosDiarios,
-      fechamentoAjustado: dadosOrdenados.map(d => ({
-        data: d.data,
-        valor: d.fechamento_ajustado
-      }))
-    };
-  }
+      // Armazenar estatísticas calculadas
+      processados[ticker] = {
+        dados: dadosOrdenados,
+        primeiroValor,
+        ultimoValor,
+        retornoTotal,
+        retornoAnualizado,
+        volatilidade,
+        maxDrawdown,
+        retornosDiarios,
+        fechamentoAjustado: dadosOrdenados.map(d => ({
+          data: d.data,
+          valor: d.fechamento_ajustado
+        }))
+      };
+    }
     
     setDadosProcessados(processados);
     setDadosComparativos(dadosComparativosTemp);
 
-  // Calcular a cesta se ela estiver habilitada e houver ativos suficientes
-  if (exibirCesta && Object.keys(cestaAtivos).length > 0) {
-    calcularCesta(processados, cestaAtivos);
-  }
-}, [calcularDesvPadrao, cestaAtivos, exibirCesta, calcularCesta]);
+    // Calcular a cesta se ela estiver habilitada e houver ativos suficientes
+    if (exibirCesta && Object.keys(cestaAtivos).length > 0) {
+      calcularCesta(processados, cestaAtivos);
+    }
+  }, [calcularDesvPadrao, cestaAtivos, exibirCesta, calcularCesta]);
+
+  // Função para lidar com a seleção de cestas
+  const handleCestaSelect = (cesta) => {
+    setNomeCesta(cesta.nome);
+    setCestaAtivos(cesta.ativos);
+    setExibirCesta(true);
+    setMostrarGerenciadorCestas(false);
+    
+    // Recalcular cesta para exibição
+    calcularCesta(dadosProcessados, cesta.ativos);
+  };
 
   // Verificar status da API quando o componente carrega
   useEffect(() => {
@@ -342,7 +356,7 @@ function App() {
   };
 
   // Atualizar a cesta com os pesos definidos
-  const atualizarCesta = () => {
+  const atualizarCesta = async () => {
     if (Object.keys(cestaAtivos).length === 0) {
       setErro("Adicione pelo menos um ativo à cesta");
       return;
@@ -375,6 +389,33 @@ function App() {
     
     // Recalcular cesta
     calcularCesta(dadosProcessados, pesosFiltrados);
+    
+    // Perguntar ao usuário se deseja salvar a cesta
+    const desejaSalvar = window.confirm(
+      `Deseja salvar a cesta "${nomeCesta}" para uso futuro?`
+    );
+    
+    if (desejaSalvar) {
+      try {
+        setCarregando(true);
+        
+        const cestaDados = {
+          nome: nomeCesta,
+          descricao: `Cesta criada em ${new Date().toLocaleDateString()}`,
+          ativos: pesosFiltrados
+        };
+        
+        await axios.post(`${API_URL}/cesta`, cestaDados);
+        
+        setErro(null);
+        alert(`Cesta "${nomeCesta}" salva com sucesso!`);
+      } catch (error) {
+        console.error('Erro ao salvar cesta:', error);
+        setErro("Erro ao salvar cesta. Verifique a conexão com o servidor.");
+      } finally {
+        setCarregando(false);
+      }
+    }
   };
 
   // Função para obter cor do badge
@@ -390,7 +431,6 @@ function App() {
     ];
     return coresBadge[index % coresBadge.length];
   }, []);
-
 
   // Preparar dados para o gráfico
   const prepararDadosGrafico = useCallback(() => {
@@ -500,8 +540,25 @@ function App() {
             </div>
 
             <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-              <h2 className="text-xl font-semibold mb-3 text-gray-800">Período de Análise</h2>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex justify-between items-center mb-3">
+                <h2 className="text-xl font-semibold text-gray-800">Período de Análise</h2>
+                <div>
+                  <button 
+                    onClick={() => setMostrarCestaConfig(!mostrarCestaConfig)}
+                    className="px-3 py-1 rounded text-sm bg-purple-500 text-white hover:bg-purple-600 mr-2"
+                  >
+                    {mostrarCestaConfig ? 'Fechar' : 'Criar Cesta'}
+                  </button>
+                  <button 
+                    onClick={() => setMostrarGerenciadorCestas(true)}
+                    className="px-3 py-1 rounded text-sm bg-blue-500 text-white hover:bg-blue-600"
+                  >
+                    Gerenciar Cestas
+                  </button>
+                </div>
+              </div>
+              
+              <div className="flex flex-wrap gap-2 mb-4">
                 {Object.entries(periodos).map(([nome, dias]) => (
                   <button
                     key={nome}
@@ -516,120 +573,92 @@ function App() {
                   </button>
                 ))}
               </div>
-             
-              <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-                <div className="flex justify-between items-center mb-3">
-                  <h2 className="text-xl font-semibold text-gray-800">Período de Análise</h2>
-                  <button 
-                    onClick={() => setMostrarCestaConfig(!mostrarCestaConfig)}
-                    className="px-3 py-1 rounded text-sm bg-purple-500 text-white hover:bg-purple-600"
+              
+              {/* Botão para alternar visibilidade da cesta */}
+              {exibirCesta && (
+                <div className="flex justify-between items-center mt-2">
+                  <div className="flex items-center">
+                    <input 
+                      type="checkbox" 
+                      id="toggle-cesta" 
+                      checked={exibirCesta}
+                      onChange={() => setExibirCesta(!exibirCesta)}
+                      className="mr-2"
+                    />
+                    <label htmlFor="toggle-cesta" className="text-sm">
+                      Exibir {nomeCesta}
+                    </label>
+                  </div>
+                  <button
+                    onClick={() => setMostrarCestaConfig(true)}
+                    className="text-blue-500 text-sm hover:text-blue-700"
                   >
-                    {mostrarCestaConfig ? 'Fechar' : 'Criar Cesta'}
+                    Editar
                   </button>
                 </div>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {Object.entries(periodos).map(([nome, dias]) => (
-                    <button
-                      key={nome}
-                      className={`px-3 py-1 rounded text-sm transition-colors duration-200 ${
-                        periodoComparativo === dias 
-                        ? 'bg-blue-500 text-white' 
-                        : 'bg-gray-200 hover:bg-gray-300'
-                      }`}
-                      onClick={() => setPeriodoComparativo(dias)}
-                    >
-                      {nome}
-                    </button>
-                  ))}
+              )}
+            </div>
+
+            {/* Painel de configuração da cesta */}
+            {mostrarCestaConfig && (
+              <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+                <h2 className="text-lg font-semibold mb-3 text-gray-800">Configurar Cesta de Ativos</h2>
+                
+                <div className="mb-4">
+                  <label htmlFor="nome-cesta" className="block text-sm font-medium text-gray-700 mb-1">
+                    Nome da Cesta
+                  </label>
+                  <input
+                    type="text"
+                    id="nome-cesta"
+                    value={nomeCesta}
+                    onChange={(e) => setNomeCesta(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded"
+                    placeholder="Ex: Minha Cesta Balanceada"
+                  />
                 </div>
                 
-                {/* Botão para alternar visibilidade da cesta */}
-                {exibirCesta && (
-                  <div className="flex justify-between items-center mt-2">
-                    <div className="flex items-center">
-                      <input 
-                        type="checkbox" 
-                        id="toggle-cesta" 
-                        checked={exibirCesta}
-                        onChange={() => setExibirCesta(!exibirCesta)}
-                        className="mr-2"
-                      />
-                      <label htmlFor="toggle-cesta" className="text-sm">
-                        Exibir {nomeCesta}
-                      </label>
+                <div className="mb-4">
+                  <h3 className="text-sm font-medium text-gray-700 mb-2">Composição (Pesos %)</h3>
+                  <form ref={cestaFormRef}>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {ativos.filter(ativo => selecionados.includes(ativo.ticker)).map(ativo => (
+                        <div key={ativo.ticker} className="flex items-center">
+                          <label className="inline-block w-28 truncate text-sm" title={ativo.nome}>
+                            {ativo.nome}:
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="1"
+                            value={cestaAtivos[ativo.ticker] || 0}
+                            onChange={(e) => handlePesoChange(ativo.ticker, e.target.value)}
+                            className="w-20 p-1 border border-gray-300 rounded text-right"
+                          />
+                          <span className="ml-1 text-sm">%</span>
+                        </div>
+                      ))}
                     </div>
-                    <button
-                      onClick={() => setMostrarCestaConfig(true)}
-                      className="text-blue-500 text-sm hover:text-blue-700"
-                    >
-                      Editar
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Painel de configuração da cesta */}
-              {mostrarCestaConfig && (
-                <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-                  <h2 className="text-lg font-semibold mb-3 text-gray-800">Configurar Cesta de Ativos</h2>
-                  
-                  <div className="mb-4">
-                    <label htmlFor="nome-cesta" className="block text-sm font-medium text-gray-700 mb-1">
-                      Nome da Cesta
-                    </label>
-                    <input
-                      type="text"
-                      id="nome-cesta"
-                      value={nomeCesta}
-                      onChange={(e) => setNomeCesta(e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded"
-                      placeholder="Ex: Minha Cesta Balanceada"
-                    />
-                  </div>
-                  
-                  <div className="mb-4">
-                    <h3 className="text-sm font-medium text-gray-700 mb-2">Composição (Pesos %)</h3>
-                    <form ref={cestaFormRef}>
-                      <div className="space-y-2 max-h-64 overflow-y-auto">
-                        {ativos.filter(ativo => selecionados.includes(ativo.ticker)).map(ativo => (
-                          <div key={ativo.ticker} className="flex items-center">
-                            <label className="inline-block w-28 truncate text-sm" title={ativo.nome}>
-                              {ativo.nome}:
-                            </label>
-                            <input
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="1"
-                              value={cestaAtivos[ativo.ticker] || 0}
-                              onChange={(e) => handlePesoChange(ativo.ticker, e.target.value)}
-                              className="w-20 p-1 border border-gray-300 rounded text-right"
-                            />
-                            <span className="ml-1 text-sm">%</span>
-                          </div>
-                        ))}
-                      </div>
-                    </form>
-                  </div>
-                  
-                  <div className="flex justify-between">
-                    <button
-                      onClick={() => setMostrarCestaConfig(false)}
-                      className="px-3 py-1 rounded text-sm bg-gray-200 hover:bg-gray-300"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      onClick={atualizarCesta}
-                      className="px-3 py-1 rounded text-sm bg-blue-500 text-white hover:bg-blue-600"
-                    >
-                      Aplicar
-                    </button>
-                  </div>
+                  </form>
                 </div>
-              )}
-
-            </div>
+                
+                <div className="flex justify-between">
+                  <button
+                    onClick={() => setMostrarCestaConfig(false)}
+                    className="px-3 py-1 rounded text-sm bg-gray-200 hover:bg-gray-300"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={atualizarCesta}
+                    className="px-3 py-1 rounded text-sm bg-blue-500 text-white hover:bg-blue-600"
+                  >
+                    Aplicar
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Tabela de Estatísticas */}
             <div className="bg-white rounded-lg shadow-md p-4">
@@ -644,7 +673,6 @@ function App() {
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ativo</th>
                         <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Preço</th>
                         <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Retorno (%)</th>
-                        
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -655,7 +683,7 @@ function App() {
                         
                         return (
                           <tr key={ticker} className="hover:bg-gray-50">
-                            <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
+<td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
                               {ativo ? ativo.nome : ticker}
                             </td>
                             <td className="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-900">
@@ -670,35 +698,31 @@ function App() {
                                 {retornoAcumulado !== null ? `${retornoAcumulado.toFixed(2)}%` : '-'}
                               </span>
                             </td>
-
                           </tr>
                         );
                       })}
-                                  {exibirCesta && dadosCesta.length > 0 && (
-              <tr className="bg-purple-50 hover:bg-purple-100">
-                <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-purple-800">
-                  {nomeCesta}
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-900">-</td>
-                <td className="px-3 py-2 whitespace-nowrap text-sm text-right">
-                  <span className={`${
-                    dadosCesta[dadosCesta.length - 1].valor > 0 
-                    ? 'text-green-600' 
-                    : 'text-red-600'
-                  }`}>
-                    {dadosCesta[dadosCesta.length - 1].valor.toFixed(2)}%
-                  </span>
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-900">-</td>
-              </tr>
-            )}
+                      {exibirCesta && dadosCesta.length > 0 && (
+                        <tr className="bg-purple-50 hover:bg-purple-100">
+                          <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-purple-800">
+                            {nomeCesta}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-900">-</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-right">
+                            <span className={`${
+                              dadosCesta[dadosCesta.length - 1].valor > 0 
+                              ? 'text-green-600' 
+                              : 'text-red-600'
+                            }`}>
+                              {dadosCesta[dadosCesta.length - 1].valor.toFixed(2)}%
+                            </span>
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
               )}
             </div>
-
-
           </div>
 
           {/* Painel principal - Gráficos */}
@@ -713,59 +737,59 @@ function App() {
               ) : dadosGrafico.length > 0 ? (
                 <div className="h-96">
                   <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={dadosGrafico} margin={{ top: 5, right: 30, left: 20, bottom: 5 }} >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="data" 
-                      tickFormatter={(data) => {
-                        const d = new Date(data);
-                        return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear().toString().slice(2)}`;
-                      }}
-                    />
-                    <YAxis 
-                      domain={['auto', 'auto']} 
-                      tickFormatter={(value) => `${value.toFixed(2)}%`}
-                    />
-                    <Tooltip 
-                      formatter={(value, name) => {
-                        // Buscar o nome completo do ativo baseado no ticker
-                        const ativoNome = getNomeAtivo(name);
-                        return [`${value.toFixed(2)}%`, ativoNome];
-                      }}
-                      labelFormatter={formatarData}
-                      itemSorter={(item) => -item.value} // Ordenar itens do maior para o menor valor
-                    />
-                    <Legend verticalAlign="top" height={36} />
-                    
-                    {/* Primeiro exibir as linhas dos ativos selecionados */}
-                    {selecionados.map((ticker, index) => (
-                      <Line
-                        key={ticker}
-                        type="monotone"
-                        dataKey={ticker}
-                        stroke={cores[index % cores.length]}
-                        name={getNomeAtivo(ticker)}
-                        dot={false}
-                        activeDot={{ r: 6 }}  
-                        connectNulls={true}                      
+                    <LineChart data={dadosGrafico} margin={{ top: 5, right: 30, left: 20, bottom: 5 }} >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="data" 
+                        tickFormatter={(data) => {
+                          const d = new Date(data);
+                          return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear().toString().slice(2)}`;
+                        }}
                       />
-                    ))}
-                    
-                    {/* Depois exibir a linha da cesta, se estiver ativa */}
-                    {exibirCesta && dadosCesta.length > 0 && (
-                      <Line
-                        key={nomeCesta}
-                        type="monotone"
-                        dataKey={nomeCesta}
-                        stroke="#ff00ff"  // Magenta para destacar
-                        strokeWidth={3}
-                        name={nomeCesta}
-                        dot={false}
-                        activeDot={{ r: 7 }} 
-                        connectNulls={true}                       
+                      <YAxis 
+                        domain={['auto', 'auto']} 
+                        tickFormatter={(value) => `${value.toFixed(2)}%`}
                       />
-                    )}
-                  </LineChart>
+                      <Tooltip 
+                        formatter={(value, name) => {
+                          // Buscar o nome completo do ativo baseado no ticker
+                          const ativoNome = getNomeAtivo(name);
+                          return [`${value.toFixed(2)}%`, ativoNome];
+                        }}
+                        labelFormatter={formatarData}
+                        itemSorter={(item) => -item.value} // Ordenar itens do maior para o menor valor
+                      />
+                      <Legend verticalAlign="top" height={36} />
+                      
+                      {/* Primeiro exibir as linhas dos ativos selecionados */}
+                      {selecionados.map((ticker, index) => (
+                        <Line
+                          key={ticker}
+                          type="monotone"
+                          dataKey={ticker}
+                          stroke={cores[index % cores.length]}
+                          name={getNomeAtivo(ticker)}
+                          dot={false}
+                          activeDot={{ r: 6 }}  
+                          connectNulls={true}                      
+                        />
+                      ))}
+                      
+                      {/* Depois exibir a linha da cesta, se estiver ativa */}
+                      {exibirCesta && dadosCesta.length > 0 && (
+                        <Line
+                          key={nomeCesta}
+                          type="monotone"
+                          dataKey={nomeCesta}
+                          stroke="#ff00ff"  // Magenta para destacar
+                          strokeWidth={3}
+                          name={nomeCesta}
+                          dot={false}
+                          activeDot={{ r: 7 }} 
+                          connectNulls={true}                       
+                        />
+                      )}
+                    </LineChart>
                   </ResponsiveContainer>
                 </div>
               ) : (
@@ -822,26 +846,17 @@ function App() {
                 );
               })}
             </div>
+
+            {/* Visualização da Composição da Cesta */}
             {exibirCesta && (
-            <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-              <h2 className="text-xl font-semibold mb-3 text-gray-800">Composição do {nomeCesta}</h2>
-              
-              <div className="flex flex-wrap gap-3">
-                {Object.entries(cestaAtivos)
-                  .filter(([ticker, peso]) => peso > 0)
-                  .map(([ticker, peso], index) => (
-                    <div 
-                      key={ticker} 
-                      className={`px-4 py-2 rounded-full border ${getBadgeColor(index)}`}
-                    >
-                      <span className="font-medium">{getNomeAtivo(ticker)}: </span>
-                      <span>{peso.toFixed(0)}%</span>
-                    </div>
-                  ))
-                }
-              </div>
-            </div>
-          )}
+              <CestaComposition 
+                nome={nomeCesta}
+                ativos={ativos}
+                cestaAtivos={cestaAtivos}
+                getNomeAtivo={getNomeAtivo}
+              />
+            )}
+
             {/* Informações Adicionais */}
             <div className="bg-white rounded-lg shadow-md p-4">
               <h2 className="text-xl font-semibold mb-3 text-gray-800">Sobre os Ativos</h2>
@@ -873,6 +888,16 @@ function App() {
           Desenvolvido com React e Tailwind CSS | Dados provenientes de Yahoo Finance e Banco Central do Brasil
         </p>
       </footer>
+
+      {/* Modal para gerenciamento de cestas */}
+      {mostrarGerenciadorCestas && (
+        <CestasManager 
+          ativos={ativos}
+          selecionados={selecionados}
+          onCestaSelect={handleCestaSelect}
+          onClose={() => setMostrarGerenciadorCestas(false)}
+        />
+      )}
     </div>
   );
 }
