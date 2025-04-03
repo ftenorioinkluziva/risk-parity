@@ -3,6 +3,7 @@ import axios from 'axios';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import CestasManager from './components/CestasManager';
 import CestaComposition from './components/CestaComposition';
+import TransactionManager from './components/TransactionManager';
 
 // Configuração da URL base da API
 const API_URL = 'http://localhost:5000/api';
@@ -479,7 +480,8 @@ function App() {
     '90 dias': 90,
     '6 meses': 180,
     '1 ano': 365,
-    '3 anos': 1095
+    '3 anos': 1095,
+    '5 anos': 1.825
   };
 
   return (
@@ -491,6 +493,7 @@ function App() {
             Análise comparativa de investimentos
           </p>
         </div>
+
       </header>
 
       <main className="container mx-auto p-4">
@@ -499,7 +502,7 @@ function App() {
             {erro}
           </div>
         )}
-
+        
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Painel lateral esquerdo */}
           <div className="lg:col-span-1">
@@ -785,7 +788,11 @@ function App() {
                 </div>
               )}
             </div>
+            {/* Painel principal - Transações */}
+            <div className="bg-white rounded-lg shadow-md p-4 mb-6">
 
+            <TransactionManager />
+            </div>
             {/* Cards de Ativos */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               {selecionados.map((ticker, index) => {
