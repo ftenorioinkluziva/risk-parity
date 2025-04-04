@@ -87,9 +87,15 @@ const TransactionManager = () => {
   // Calculate portfolio based on transactions
   const calculatePortfolio = () => {
     const portfolio = {};
+
+
+    const sortedTransactions = [...transactions].sort((a, b) => 
+      new Date(a.date) - new Date(b.date)
+    );
+
     
-    // Group transactions by asset
-    transactions.forEach(transaction => {
+    // Process each transaction
+    sortedTransactions.forEach(transaction => {
       const ativoId = transaction.ativo_id;
       const asset = assets.find(a => a.id === ativoId);
       
@@ -108,17 +114,17 @@ const TransactionManager = () => {
       const assetData = portfolio[ativoId];
       
       if (transaction.type === 'buy') {
-        // Calculate average price for buys
+        // For buys, update average price and add to quantity
         const oldValue = assetData.quantity * assetData.averagePrice;
         const newValue = transaction.quantity * transaction.price;
-        const newQuantity = assetData.quantity + transaction.quantity;
+        const newQuantity = assetData.quantity + Number(transaction.quantity);
         
         assetData.averagePrice = newQuantity > 0 ? (oldValue + newValue) / newQuantity : 0;
-        assetData.quantity += transaction.quantity;
-        assetData.totalInvestment += transaction.quantity * transaction.price;
+        assetData.quantity = newQuantity;
+        assetData.totalInvestment += Number(transaction.quantity) * transaction.price;
       } else if (transaction.type === 'sell') {
         // For sells, reduce quantity
-        assetData.quantity -= transaction.quantity;
+        assetData.quantity -= Number(transaction.quantity);
         
         // Adjust invested value proportionally
         if (assetData.quantity > 0) {
