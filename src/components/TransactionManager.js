@@ -103,9 +103,12 @@ const TransactionManager = () => {
   // Calculate portfolio based on transactions
   const calculatePortfolio = () => {
     const portfolio = {};
-    
+
+    // Sort transactions by date (oldest first) to ensure proper calculation
+    const sortedTransactions = [...transactions].sort((a, b) => new Date(a.date) - new Date(b.date));
+
     // Group transactions by asset
-    transactions.forEach(transaction => {
+    sortedTransactions.forEach(transaction => {
       const ativoId = transaction.ativo_id;
       const asset = assets.find(a => a.id === ativoId);
       
