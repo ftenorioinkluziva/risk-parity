@@ -4,6 +4,8 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import CestasManager from './components/CestasManager';
 import CestaComposition from './components/CestaComposition';
 import TransactionManager from './components/TransactionManager';
+import PriceUpdateButton from './components/PriceUpdateButton';
+import LastUpdateIndicator from './components/LastUpdateIndicator';
 
 // Configuração da URL base da API
 const API_URL = 'http://localhost:5000/api';
@@ -481,19 +483,26 @@ function App() {
     '6 meses': 180,
     '1 ano': 365,
     '3 anos': 1095,
-    '5 anos': 1.825
+    '5 anos': 1825
   };
 
   return (
     <div className="min-h-screen bg-gray-100">
       <header className="bg-blue-600 text-white p-4 shadow-md">
-        <div className="container mx-auto">
-          <h1 className="text-3xl font-bold">Dashboard de Ativos Financeiros</h1>
-          <p className="text-blue-100 mt-1">
-            Análise comparativa de investimentos
-          </p>
+        <div className="container mx-auto flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Dashboard de Ativos Financeiros</h1>
+            <p className="text-blue-100 mt-1">
+              Análise comparativa de investimentos
+            </p>
+          </div>
+          <div className="flex flex-col items-end">
+            <PriceUpdateButton />
+            <div className="mt-2">
+              <LastUpdateIndicator />
+            </div>
+          </div>
         </div>
-
       </header>
 
       <main className="container mx-auto p-4">
