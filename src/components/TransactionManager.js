@@ -40,7 +40,7 @@ const TransactionManager = () => {
   const [activeTab, setActiveTab] = useState('portfolio');
   
   // API URL
-  const API_URL = 'http://localhost:5000/api';
+  const API_URL = 'http://localhost:5001/api';
 
   // Fetch assets when component mounts
   useEffect(() => {

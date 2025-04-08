@@ -18,7 +18,7 @@ const CestasManager = ({ ativos, selecionados, onCestaSelect, onClose }) => {
   });
 
   // API URL
-  const API_URL = 'http://localhost:5000/api';
+  const API_URL = 'http://localhost:5001/api';
 
   // Carregar todas as cestas
   const carregarCestas = async () => {
