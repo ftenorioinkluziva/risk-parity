@@ -4,8 +4,8 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import CestasManager from './components/CestasManager';
 import CestaComposition from './components/CestaComposition';
 import TransactionManager from './components/TransactionManager';
-import PriceUpdateButton from './components/PriceUpdateButton';
-import LastUpdateIndicator from './components/LastUpdateIndicator';
+/* import PriceUpdateButton from './components/PriceUpdateButton';
+import LastUpdateIndicator from './components/LastUpdateIndicator'; */
 
 // Configuração da URL base da API
 const API_URL = 'http://localhost:5001/api';
@@ -496,12 +496,12 @@ function App() {
               Análise comparativa de investimentos
             </p>
           </div>
-          <div className="flex flex-col items-end">
+{/*           <div className="flex flex-col items-end">
             <PriceUpdateButton />
             <div className="mt-2">
               <LastUpdateIndicator />
             </div>
-          </div>
+          </div> */}
         </div>
       </header>
 

@@ -1,17 +1,31 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState } from 'react';
+import { usePortfolio } from '../contexts/PortfolioContext';
 
 const TransactionManager = () => {
-  // State for transactions and assets
-  const [transactions, setTransactions] = useState([]);
-  const [assets, setAssets] = useState([]);
-  const [investmentFunds, setInvestmentFunds] = useState([]);
-  const [cashBalance, setCashBalance] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
+  // Usar o contexto de portfólio
+  const { 
+    transactions, 
+    assets, 
+    investmentFunds,
+    cashBalance,
+    portfolio,
+    totals,
+    loading,
+    error,
+    lastUpdate,
+    isRefreshing,
+    fetchAllData,
+    addTransaction,
+    addInvestmentFund,
+    updateInvestmentFund,
+    deleteInvestmentFund,
+    updateCashBalance,
+    formatCurrency,
+    updatingPrices,
+    updatePricesRTD
+  } = usePortfolio();
   
-  // Form state
+  // Estados locais para os formulários
   const [formVisible, setFormVisible] = useState(false);
   const [formData, setFormData] = useState({
     type: 'buy',
@@ -21,7 +35,6 @@ const TransactionManager = () => {
     date: new Date().toISOString().split('T')[0]
   });
   
-  // Investment fund form state
   const [fundFormVisible, setFundFormVisible] = useState(false);
   const [fundFormData, setFundFormData] = useState({
     name: '',
@@ -30,168 +43,15 @@ const TransactionManager = () => {
     current_value: ''
   });
   
-  // Cash balance form state
   const [cashFormVisible, setCashFormVisible] = useState(false);
   const [cashForm, setCashForm] = useState({
     value: ''
   });
   
-  // Tab state
   const [activeTab, setActiveTab] = useState('portfolio');
-  
-  // API URL
-  const API_URL = 'http://localhost:5001/api';
+  const [success, setSuccess] = useState(null);
 
-  // Fetch assets when component mounts
-  useEffect(() => {
-    const fetchAssets = async () => {
-      setLoading(true);
-      try {
-        const response = await axios.get(`${API_URL}/ativos`);
-        setAssets(response.data);
-        setError(null);
-      } catch (err) {
-        console.error('Error fetching assets:', err);
-        setError('Failed to load assets. Please check your connection.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAssets();
-  }, []);
-
-  // Fetch transactions after assets are loaded
-  useEffect(() => {
-    if (assets.length === 0) return;
-    
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        // Fetch transactions
-        const transactionsResponse = await axios.get(`${API_URL}/transacoes`);
-        setTransactions(transactionsResponse.data);
-        
-        // Fetch investment funds
-        const fundsResponse = await axios.get(`${API_URL}/investment-funds`);
-        setInvestmentFunds(fundsResponse.data);
-        
-        // Fetch cash balance
-        const cashResponse = await axios.get(`${API_URL}/cash-balance`);
-        setCashBalance(cashResponse.data.value || 0);
-        
-        setError(null);
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setError('Failed to load data. Please check your connection.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [assets]);
-
-  // Format currency
-  const formatCurrency = (value) => {
-    return new Intl.NumberFormat('pt-BR', { 
-      style: 'currency', 
-      currency: 'BRL' 
-    }).format(value);
-  };
-  
-  // Calculate portfolio based on transactions
-  const calculatePortfolio = () => {
-    const portfolio = {};
-
-    // Sort transactions by date (oldest first) to ensure proper calculation
-    const sortedTransactions = [...transactions].sort((a, b) => new Date(a.date) - new Date(b.date));
-
-    // Group transactions by asset
-    sortedTransactions.forEach(transaction => {
-      const ativoId = transaction.ativo_id;
-      const asset = assets.find(a => a.id === ativoId);
-      
-      if (!asset) return; // Skip if asset not found
-      
-      if (!portfolio[ativoId]) {
-        portfolio[ativoId] = {
-          ativo_id: ativoId,
-          asset,
-          quantity: 0,
-          totalInvestment: 0,
-          averagePrice: 0
-        };
-      }
-      
-      const assetData = portfolio[ativoId];
-      
-      if (transaction.type === 'buy') {
-        // Calculate average price for buys
-        const oldValue = assetData.quantity * assetData.averagePrice;
-        const newValue = transaction.quantity * transaction.price;
-        const newQuantity = assetData.quantity + transaction.quantity;
-        
-        assetData.averagePrice = newQuantity > 0 ? (oldValue + newValue) / newQuantity : 0;
-        assetData.quantity += transaction.quantity;
-        assetData.totalInvestment += transaction.quantity * transaction.price;
-      } else if (transaction.type === 'sell') {
-        // For sells, reduce quantity
-        assetData.quantity -= transaction.quantity;
-        
-        // Adjust invested value proportionally
-        if (assetData.quantity > 0) {
-          assetData.totalInvestment = assetData.quantity * assetData.averagePrice;
-        } else {
-          assetData.quantity = 0;
-          assetData.totalInvestment = 0;
-        }
-      }
-      
-      // Calculate current value and profit
-      assetData.currentPrice = asset.preco_atual;
-      assetData.currentValue = assetData.quantity * assetData.currentPrice;
-      assetData.profit = assetData.currentValue - assetData.totalInvestment;
-      assetData.profitPercentage = assetData.totalInvestment > 0 
-        ? (assetData.profit / assetData.totalInvestment) * 100 
-        : 0;
-    });
-    
-    // Filter assets with quantity > 0
-    return Object.values(portfolio).filter(asset => asset.quantity > 0);
-  };
-  
-  // Calculate total portfolio value including investment funds and cash
-  const calculateTotals = (portfolio) => {
-    const assetsTotalInvestment = portfolio.reduce((sum, asset) => sum + asset.totalInvestment, 0);
-    const assetsTotalValue = portfolio.reduce((sum, asset) => sum + asset.currentValue, 0);
-    const assetsProfit = portfolio.reduce((sum, asset) => sum + asset.profit, 0);
-    
-    // Sum investment funds current values
-    const fundsTotalInvestment = investmentFunds.reduce((sum, fund) => sum + parseFloat(fund.initial_investment || 0), 0);
-    const fundsTotalValue = investmentFunds.reduce((sum, fund) => sum + parseFloat(fund.current_value || 0), 0);
-    const fundsProfit = fundsTotalValue - fundsTotalInvestment;
-    
-    // Total investment and value including cash
-    const totalInvestment = assetsTotalInvestment + fundsTotalInvestment;
-    const totalValue = assetsTotalValue + fundsTotalValue + cashBalance;
-    const totalProfit = assetsProfit + fundsProfit;
-    
-    // Calculate overall percentage
-    const profitPercentage = totalInvestment > 0 ? (totalProfit / totalInvestment) * 100 : 0;
-    
-    return { 
-      totalInvestment, 
-      totalValue, 
-      totalProfit, 
-      profitPercentage,
-      assetsTotalValue,
-      fundsTotalValue,
-      cashBalance
-    };
-  };
-  
-  // Handle form field changes
+  // Handler para mudanças no formulário
   const handleFormChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -200,7 +60,7 @@ const TransactionManager = () => {
     }));
   };
   
-  // Handle fund form field changes
+  // Handler para mudanças no formulário de fundos
   const handleFundFormChange = (e) => {
     const { name, value } = e.target;
     setFundFormData(prev => ({
@@ -209,7 +69,7 @@ const TransactionManager = () => {
     }));
   };
   
-  // Handle cash form field changes
+  // Handler para mudanças no formulário de saldo
   const handleCashFormChange = (e) => {
     const { name, value } = e.target;
     setCashForm(prev => ({
@@ -218,23 +78,17 @@ const TransactionManager = () => {
     }));
   };
   
-  // Add new transaction
+  // Adicionar nova transação
   const handleAddTransaction = async () => {
-    // Basic validation
     if (!formData.ativo_id || !formData.quantity || !formData.price || !formData.date) {
-      setError('Please fill in all fields');
+      setSuccess({ success: false, message: 'Please fill in all fields' });
       return;
     }
     
-    setLoading(true);
-    try {
-      const response = await axios.post(`${API_URL}/transacoes`, formData);
-      
-      // Add the new transaction to state
-      setTransactions([...transactions, response.data]);
-      
-      // Show success message
-      setSuccess('Transaction added successfully!');
+    const result = await addTransaction(formData);
+    
+    if (result.success) {
+      setSuccess({ success: true, message: 'Transaction added successfully!' });
       setTimeout(() => setSuccess(null), 3000);
       
       // Reset form
@@ -246,40 +100,28 @@ const TransactionManager = () => {
         date: new Date().toISOString().split('T')[0]
       });
       
-      // Hide form
       setFormVisible(false);
-      
-      setError(null);
-    } catch (err) {
-      console.error('Error adding transaction:', err);
-      setError(err.response?.data?.erro || 'Failed to add transaction');
-    } finally {
-      setLoading(false);
+    } else {
+      setSuccess({ success: false, message: result.error });
     }
   };
   
-  // Add new investment fund
+  // Adicionar novo fundo de investimento
   const handleAddFund = async () => {
-    // Basic validation
     if (!fundFormData.name || !fundFormData.initial_investment || !fundFormData.current_value || !fundFormData.investment_date) {
-      setError('Please fill in all fields for the investment fund');
+      setSuccess({ success: false, message: 'Please fill in all fields for the investment fund' });
       return;
     }
     
-    setLoading(true);
-    try {
-      const response = await axios.post(`${API_URL}/investment-funds`, {
-        name: fundFormData.name,
-        initial_investment: parseFloat(fundFormData.initial_investment),
-        current_value: parseFloat(fundFormData.current_value),
-        investment_date: fundFormData.investment_date
-      });
-      
-      // Add the new fund to state
-      setInvestmentFunds([...investmentFunds, response.data]);
-      
-      // Show success message
-      setSuccess('Investment Fund added successfully!');
+    const result = await addInvestmentFund({
+      name: fundFormData.name,
+      initial_investment: parseFloat(fundFormData.initial_investment),
+      current_value: parseFloat(fundFormData.current_value),
+      investment_date: fundFormData.investment_date
+    });
+    
+    if (result.success) {
+      setSuccess({ success: true, message: 'Investment Fund added successfully!' });
       setTimeout(() => setSuccess(null), 3000);
       
       // Reset form
@@ -290,26 +132,18 @@ const TransactionManager = () => {
         current_value: ''
       });
       
-      // Hide form
       setFundFormVisible(false);
-      
-      setError(null);
-    } catch (err) {
-      console.error('Error adding investment fund:', err);
-      setError(err.response?.data?.erro || 'Failed to add investment fund');
-    } finally {
-      setLoading(false);
+    } else {
+      setSuccess({ success: false, message: result.error });
     }
   };
   
-  // Update investment fund
+  // Atualizar fundo de investimento
   const handleUpdateFund = async (id, field, value) => {
     try {
-      // Find the fund to update
       const fund = investmentFunds.find(f => f.id === id);
       if (!fund) return;
       
-      // Prepare update data
       const updateData = { ...fund };
       
       if (field === 'current_value' || field === 'initial_investment') {
@@ -318,84 +152,56 @@ const TransactionManager = () => {
         updateData[field] = value;
       }
       
-      const response = await axios.put(`${API_URL}/investment-funds/${id}`, updateData);
+      const result = await updateInvestmentFund(id, updateData);
       
-      // Update state with the updated fund
-      setInvestmentFunds(
-        investmentFunds.map(fund => fund.id === id ? response.data : fund)
-      );
-      
-      // Show success message
-      setSuccess('Investment Fund updated successfully!');
-      setTimeout(() => setSuccess(null), 3000);
+      if (result.success) {
+        setSuccess({ success: true, message: 'Investment Fund updated successfully!' });
+        setTimeout(() => setSuccess(null), 3000);
+      } else {
+        setSuccess({ success: false, message: result.error });
+      }
     } catch (err) {
-      console.error('Error updating investment fund:', err);
-      setError(err.response?.data?.erro || 'Failed to update investment fund');
+      setSuccess({ success: false, message: 'Error updating investment fund' });
     }
   };
   
-  // Delete investment fund
+  // Excluir fundo de investimento
   const handleDeleteFund = async (id) => {
     if (!window.confirm('Are you sure you want to delete this investment fund?')) {
       return;
     }
     
-    setLoading(true);
-    try {
-      await axios.delete(`${API_URL}/investment-funds/${id}`);
-      
-      // Remove the fund from state
-      setInvestmentFunds(investmentFunds.filter(fund => fund.id !== id));
-      
-      // Show success message
-      setSuccess('Investment Fund deleted successfully!');
+    const result = await deleteInvestmentFund(id);
+    
+    if (result.success) {
+      setSuccess({ success: true, message: 'Investment Fund deleted successfully!' });
       setTimeout(() => setSuccess(null), 3000);
-    } catch (err) {
-      console.error('Error deleting investment fund:', err);
-      setError(err.response?.data?.erro || 'Failed to delete investment fund');
-    } finally {
-      setLoading(false);
+    } else {
+      setSuccess({ success: false, message: result.error });
     }
   };
   
-  // Update cash balance
+  // Atualizar saldo em caixa
   const handleUpdateCash = async () => {
     if (!cashForm.value) {
-      setError('Please enter a cash balance value');
+      setSuccess({ success: false, message: 'Please enter a cash balance value' });
       return;
     }
     
-    setLoading(true);
-    try {
-      const response = await axios.put(`${API_URL}/cash-balance`, {
-        value: parseFloat(cashForm.value)
-      });
-      
-      // Update state with the new cash balance
-      setCashBalance(response.data.value);
-      
-      // Show success message
-      setSuccess('Cash balance updated successfully!');
+    const result = await updateCashBalance(cashForm.value);
+    
+    if (result.success) {
+      setSuccess({ success: true, message: 'Cash balance updated successfully!' });
       setTimeout(() => setSuccess(null), 3000);
       
-      // Reset form and hide it
       setCashForm({ value: '' });
       setCashFormVisible(false);
-      
-      setError(null);
-    } catch (err) {
-      console.error('Error updating cash balance:', err);
-      setError(err.response?.data?.erro || 'Failed to update cash balance');
-    } finally {
-      setLoading(false);
+    } else {
+      setSuccess({ success: false, message: result.error });
     }
   };
   
-  // Calculate current portfolio
-  const portfolio = calculatePortfolio();
-  const totals = calculateTotals(portfolio);
-  
-  // Calculate returns for investment funds
+  // Calcular retorno para fundos de investimento
   const calculateFundReturn = (fund) => {
     const initialInvestment = parseFloat(fund.initial_investment || 0);
     if (initialInvestment <= 0) return 0;
@@ -409,8 +215,38 @@ const TransactionManager = () => {
       <div className="border-b border-gray-200 p-4">
         <h2 className="text-2xl font-semibold text-gray-800">Transaction Manager</h2>
         <p className="text-gray-600">Track your complete investment portfolio</p>
+        <div className="flex items-center space-x-4">
+          {lastUpdate && (
+            <span className="text-sm text-gray-500">
+              Last updated: {lastUpdate.toLocaleTimeString()}
+            </span>
+          )}
+          <button 
+            onClick={updatePricesRTD}
+            disabled={updatingPrices || isRefreshing}
+            className={`px-3 py-1 rounded text-sm transition-colors ${
+              updatingPrices || isRefreshing
+                ? 'bg-gray-300 text-gray-500' 
+                : 'bg-green-100 text-green-700 hover:bg-green-200'
+            }`}
+          >
+            {updatingPrices ? 'Updating...' : 'Update Prices'}
+          </button>
+          <button 
+            onClick={fetchAllData}
+            disabled={isRefreshing || updatingPrices}
+            className={`px-3 py-1 rounded text-sm transition-colors ${
+              isRefreshing || updatingPrices
+                ? 'bg-gray-300 text-gray-500' 
+                : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+            }`}
+          >
+            {isRefreshing ? 'Refreshing...' : 'Refresh All Data'}
+          </button>
+        </div>
       </div>
-      
+
+
       {/* Error and success messages */}
       {error && (
         <div className="m-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-4">
