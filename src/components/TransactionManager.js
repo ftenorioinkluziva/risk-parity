@@ -254,11 +254,7 @@ const TransactionManager = () => {
         </div>
       )}
       
-      {success && (
-        <div className="m-4 bg-green-100 border-l-4 border-green-500 text-green-700 p-4">
-          <p>{success}</p>
-        </div>
-      )}
+      {success && <div>{typeof success === 'object' ? success.message : success}</div>}
       
       {/* Navigation tabs */}
       <div className="border-b border-gray-200">
@@ -719,7 +715,9 @@ const TransactionManager = () => {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {investmentFunds.length > 0 ? investmentFunds.map(fund => {
-                        const profit = fund.current_value - fund.initial_investment;
+                        const initialInvestment = parseFloat(fund.initial_investment || 0);
+                        const currentValue = parseFloat(fund.current_value || 0);
+                        const profit = currentValue - initialInvestment;
                         const returnPercentage = calculateFundReturn(fund);
                         
                         return (
@@ -864,17 +862,17 @@ const TransactionManager = () => {
                     return (
                       <tr key={fund.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <input 
-                            type="text"
-                            value={fund.name}
-                            onChange={(e) => handleUpdateFund(fund.id, 'name', e.target.value)}
-                            className="w-full p-1 border border-gray-300 rounded"
-                          />
+                        <input 
+                          type="text"
+                          value={fund.name || ''}
+                          onChange={(e) => handleUpdateFund(fund.id, 'name', e.target.value)}
+                          className="w-full p-1 border border-gray-300 rounded"
+                        />
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm">
                           <input 
                             type="number"
-                            value={fund.initial_investment}
+                            value={fund.initial_investment || ''}
                             onChange={(e) => handleUpdateFund(fund.id, 'initial_investment', e.target.value)}
                             className="w-full p-1 border border-gray-300 rounded text-right"
                             min="0.01"
@@ -884,7 +882,7 @@ const TransactionManager = () => {
                         <td className="px-4 py-3 whitespace-nowrap text-sm">
                           <input 
                             type="number"
-                            value={fund.current_value}
+                            value={fund.current_value || ''}
                             onChange={(e) => handleUpdateFund(fund.id, 'current_value', e.target.value)}
                             className="w-full p-1 border border-gray-300 rounded text-right"
                             min="0"
@@ -904,7 +902,7 @@ const TransactionManager = () => {
                         <td className="px-4 py-3 whitespace-nowrap text-sm">
                           <input 
                             type="date"
-                            value={fund.investment_date}
+                            value={fund.investment_date || ''}
                             onChange={(e) => handleUpdateFund(fund.id, 'investment_date', e.target.value)}
                             className="w-full p-1 border border-gray-300 rounded"
                             max={new Date().toISOString().split('T')[0]}
