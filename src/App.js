@@ -682,7 +682,7 @@ function App() {
                         
                         return (
                           <tr key={ticker} className="hover:bg-gray-50">
-<td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
+                            <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
                               {ativo ? ativo.nome : ticker}
                             </td>
                             <td className="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-900">
