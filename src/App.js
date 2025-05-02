@@ -181,8 +181,8 @@ function App() {
       );
       
       // Pegar o primeiro valor para normalização
-      const primeiroValor = dadosOrdenados[0].fechamento_ajustado;
-      const ultimoValor = dadosOrdenados[dadosOrdenados.length - 1].fechamento_ajustado;
+      const primeiroValor = dadosOrdenados[0].fechamento;
+      const ultimoValor = dadosOrdenados[dadosOrdenados.length - 1].fechamento;
       
       if (!primeiroValor) continue;
       
@@ -197,8 +197,8 @@ function App() {
       // Calcular retornos diários e volatilidade
       const retornosDiarios = [];
       for (let i = 1; i < dadosOrdenados.length; i++) {
-        if (dadosOrdenados[i-1].fechamento_ajustado && dadosOrdenados[i].fechamento_ajustado) {
-          const retornoDiario = (dadosOrdenados[i].fechamento_ajustado / dadosOrdenados[i-1].fechamento_ajustado - 1) * 100;
+        if (dadosOrdenados[i-1].fechamento && dadosOrdenados[i].fechamento) {
+          const retornoDiario = (dadosOrdenados[i].fechamento / dadosOrdenados[i-1].fechamento - 1) * 100;
           retornosDiarios.push(retornoDiario);
         }
       }
@@ -211,10 +211,10 @@ function App() {
       let picoDado = primeiroValor;
       
       for (const dado of dadosOrdenados) {
-        if (dado.fechamento_ajustado > picoDado) {
-          picoDado = dado.fechamento_ajustado;
+        if (dado.fechamento > picoDado) {
+          picoDado = dado.fechamento;
         } else {
-          const drawdown = (dado.fechamento_ajustado / picoDado - 1) * 100;
+          const drawdown = (dado.fechamento / picoDado - 1) * 100;
           if (drawdown < maxDrawdown) {
             maxDrawdown = drawdown;
           }
@@ -224,7 +224,7 @@ function App() {
       // Preparar dados para o gráfico comparativo (base 0)
       dadosComparativosTemp[ticker] = dadosOrdenados.map(dado => ({
         data: dado.data,
-        valor: ((dado.fechamento_ajustado / primeiroValor) - 1) * 100 // Retorno percentual desde o início
+        valor: ((dado.fechamento / primeiroValor) - 1) * 100 // Retorno percentual desde o início
       }));
       
       // Armazenar estatísticas calculadas
@@ -239,7 +239,7 @@ function App() {
         retornosDiarios,
         fechamentoAjustado: dadosOrdenados.map(d => ({
           data: d.data,
-          valor: d.fechamento_ajustado
+          valor: d.fechamento
         }))
       };
     }
