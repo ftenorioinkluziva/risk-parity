@@ -3,9 +3,9 @@ import axios from 'axios';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import CestasManager from './components/CestasManager';
 import CestaComposition from './components/CestaComposition';
-import TransactionManager from './components/TransactionManager';
-/* import PriceUpdateButton from './components/PriceUpdateButton';
-import LastUpdateIndicator from './components/LastUpdateIndicator'; */
+import TransactionManager from './components/TransactionManager/index';
+import CustomDateRange from './components/CustomDateRange';
+import DateRangeDisplay from './components/DateRangeDisplay';
 
 // Configuração da URL base da API
 const API_URL = 'http://localhost:5001/api';
@@ -25,6 +25,10 @@ function App() {
   const [nomeCesta, setNomeCesta] = useState("Minha Cesta");
   const [exibirCesta, setExibirCesta] = useState(false);
   const [dadosCesta, setDadosCesta] = useState([]);
+
+  const [customStartDate, setCustomStartDate] = useState(null);
+  const [customEndDate, setCustomEndDate] = useState(null);
+  const [isCustomDateRange, setIsCustomDateRange] = useState(false);
   
   // Estado para armazenar dados históricos processados para cálculos consistentes
   const [dadosProcessados, setDadosProcessados] = useState({});
@@ -260,6 +264,28 @@ function App() {
     calcularCesta(dadosProcessados, cesta.ativos);
   };
 
+  const handleCustomDateRangeChange = (days, startDate, endDate) => {
+    // Update period state
+    setPeriodoComparativo(days);
+    
+    // Store custom date range
+    setCustomStartDate(startDate);
+    setCustomEndDate(endDate);
+    setIsCustomDateRange(true);
+    
+    // Log for debugging
+    console.log(`Custom date range selected: ${startDate} to ${endDate} (${days} days)`);
+  };
+  
+  //function to reset custom date range when a preset period is selected
+  const handlePeriodoChange = (dias) => {
+    setPeriodoComparativo(dias);
+    // Clear custom date range when user selects a preset
+    setIsCustomDateRange(false);
+    setCustomStartDate(null);
+    setCustomEndDate(null);
+  };  
+
   // Verificar status da API quando o componente carrega
   useEffect(() => {
     const verificarStatus = async () => {
@@ -308,23 +334,35 @@ function App() {
   useEffect(() => {
     const carregarDadosHistoricos = async () => {
       if (selecionados.length === 0) return;
-
+  
       setCarregando(true);
       try {
         const dadosHistoricos = {};
         
-        // Buscar dados históricos para cada ativo selecionado
+        // Process each selected ticker
         for (const ticker of selecionados) {
-          const response = await axios.get(
-            `${API_URL}/historico/${ticker}?dias=${periodoComparativo}`
-          );
+          let endpoint;
+          let response;
+          
+          if (isCustomDateRange && customStartDate && customEndDate) {
+            // Use the custom date range endpoint
+            console.log(`Using custom date range for ${ticker}: ${customStartDate} to ${customEndDate}`);
+            endpoint = `${API_URL}/historico-range/${ticker}?dataInicio=${customStartDate}&dataFim=${customEndDate}`;
+          } else {
+            // Use the existing period-based endpoint
+            endpoint = `${API_URL}/historico/${ticker}?dias=${periodoComparativo}`;
+          }
+          
+          response = await axios.get(endpoint);
           
           if (response.data && Array.isArray(response.data)) {
             dadosHistoricos[ticker] = response.data;
+          } else {
+            console.warn(`No data returned for ${ticker} or unexpected format`);
           }
         }
         
-        // Processar os dados históricos para cálculos consistentes
+        // Process the data as before
         processarDadosHistoricos(dadosHistoricos);
         
         setErro(null);
@@ -335,12 +373,12 @@ function App() {
         setCarregando(false);
       }
     };
-
+  
     if (apiStatus && apiStatus.status === 'online') {
       carregarDadosHistoricos();
     }
-  }, [selecionados, periodoComparativo, apiStatus, processarDadosHistoricos]);
-
+  }, [selecionados, periodoComparativo, customStartDate, customEndDate, isCustomDateRange, apiStatus, processarDadosHistoricos]);
+  
   // Manipular seleção/desseleção de ativos
   const handleSelecaoAtivo = (ticker) => {
     if (selecionados.includes(ticker)) {
@@ -539,8 +577,34 @@ function App() {
             </div>
 
             <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+              {/* Display current date range information */}
+              {isCustomDateRange && customStartDate && customEndDate && (
+                <DateRangeDisplay 
+                  startDate={customStartDate} 
+                  endDate={customEndDate} 
+                  periodoComparativo={periodoComparativo} 
+                />
+              )}
+
+              <CustomDateRange onDateRangeChange={handleCustomDateRangeChange} />
+              
+              <div className="flex flex-wrap gap-2 mb-4">
+                {Object.entries(periodos).map(([nome, dias]) => (
+                  <button
+                    key={nome}
+                    className={`px-3 py-1 rounded text-sm transition-colors duration-200 ${
+                      periodoComparativo === dias && !isCustomDateRange
+                      ? 'bg-blue-500 text-white' 
+                      : 'bg-gray-200 hover:bg-gray-300'
+                    }`}
+                    onClick={() => handlePeriodoChange(dias)}
+                  >
+                    {nome}
+                  </button>
+                ))}
+              </div>
+              
               <div className="flex justify-between items-center mb-3">
-                <h2 className="text-xl font-semibold text-gray-800">Período de Análise</h2>
                 <div>
                   <button 
                     onClick={() => setMostrarCestaConfig(!mostrarCestaConfig)}
@@ -555,22 +619,6 @@ function App() {
                     Gerenciar Cestas
                   </button>
                 </div>
-              </div>
-              
-              <div className="flex flex-wrap gap-2 mb-4">
-                {Object.entries(periodos).map(([nome, dias]) => (
-                  <button
-                    key={nome}
-                    className={`px-3 py-1 rounded text-sm transition-colors duration-200 ${
-                      periodoComparativo === dias 
-                      ? 'bg-blue-500 text-white' 
-                      : 'bg-gray-200 hover:bg-gray-300'
-                    }`}
-                    onClick={() => setPeriodoComparativo(dias)}
-                  >
-                    {nome}
-                  </button>
-                ))}
               </div>
               
               {/* Botão para alternar visibilidade da cesta */}
